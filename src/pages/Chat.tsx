@@ -5,6 +5,7 @@ import UserMenu from '../components/UserMenu'
 import ThemeToggle from '../components/ThemeToggle'
 import UserSearch from '../components/UserSearch'
 import RecentChats from '../components/RecentChats'
+import NotificationHandler from '../components/NotificationHandler'
 
 interface User {
   id: string
@@ -43,6 +44,7 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }) => {
   const [newMessage, setNewMessage] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
@@ -126,8 +128,19 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }) => {
     }
   }
 
+  const handleNewMessage = (message: Message) => {
+    if (selectedUser && message.sender._id === selectedUser.id) {
+      setMessages(prev => [...prev, message])
+    } else if (notificationPermission === 'granted') {
+      new Notification(`New message from ${message.sender.username}`, {
+        body: message.content
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <NotificationHandler onPermissionChange={setNotificationPermission} />
       <nav className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
