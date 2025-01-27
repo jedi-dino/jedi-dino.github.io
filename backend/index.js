@@ -1,51 +1,62 @@
-require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
-const mongoose = require('mongoose')
-const authRoutes = require('./authRoutes')
-const userRoutes = require('./userRoutes')
-const messageRoutes = require('./messageRoutes')
+import express from 'express'
+import mongoose from 'mongoose'
+import cors from 'cors'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import authRoutes from './authRoutes.js'
+import userRoutes from './userRoutes.js'
+import messageRoutes from './messageRoutes.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => {
-    console.error('MongoDB connection error:', err)
-    process.exit(1)
-  })
+const uploadsDir = path.join(__dirname, 'uploads')
+const userUploadsDir = path.join(uploadsDir, 'users')
+const messageUploadsDir = path.join(uploadsDir, 'messages')
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5174',
+const corsOptions = {
+  origin: [
+    'http://localhost:5174',
+    'http://localhost:5173',
+    'https://test.github.io',
+    'https://jedi-dino.github.io'
+  ],
   credentials: true
-}))
+}
 
+app.use(cors(corsOptions))
 app.use(express.json())
+app.use('/api/users/uploads', express.static(path.join(__dirname, 'uploads')))
 
-app.use((req, res, next) => {
-  res.header('Content-Type', 'application/json')
-  next()
-})
+mongoose.connect(process.env.MONGODB_URI)
 
-app.use((err, req, res, next) => {
-  console.error(err.stack)
-  res.status(500).json({ message: 'Something broke!' })
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' })
 })
 
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/messages', messageRoutes)
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' })
+app.use((err, req, res, next) => {
+  console.error(err.stack)
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  })
 })
 
-const PORT = process.env.PORT || 3000
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found' })
 })
 
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled promise rejection:', err)
+})
+
+const port = process.env.PORT || 3000
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`)
 })

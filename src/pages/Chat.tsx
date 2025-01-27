@@ -69,7 +69,6 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
         const parsedUser = JSON.parse(savedUser)
         setSelectedUser(parsedUser)
         isInitialLoad.current = true
-        // Hide sidebar on mobile when a chat is selected
         if (window.innerWidth < 768) {
           setShowSidebar(false)
         }
@@ -99,7 +98,6 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
   }, [selectedUser])
 
   useEffect(() => {
-    // Check for new messages and show notifications
     if (messages.length > previousMessagesLength.current) {
       const newMessages = messages.slice(previousMessagesLength.current)
       newMessages.forEach(message => {
@@ -108,8 +106,8 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
             `New message from ${message.sender.username}`,
             {
               body: message.content || (message.mediaType ? `Sent a ${message.mediaType}` : ''),
-              tag: `message-${message._id}`, // Prevent duplicate notifications
-              requireInteraction: true // Keep notification visible until user interacts with it
+              tag: `message-${message._id}`,
+              requireInteraction: true
             }
           )
         }
@@ -233,7 +231,6 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
     setMessages([])
     setIsSearching(false)
     isInitialLoad.current = true
-    // Hide sidebar on mobile when a user is selected
     if (window.innerWidth < 768) {
       setShowSidebar(false)
     }
@@ -299,13 +296,11 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-100 dark:bg-gray-900">
       <NotificationHandler onPermissionChange={handlePermissionChange} />
-      {/* Sidebar */}
       <div 
         className={`${
           showSidebar ? 'flex' : 'hidden'
         } md:flex flex-col w-full md:w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700`}
       >
-        {/* Sidebar Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Messages</h2>
@@ -324,7 +319,6 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
           </div>
         </div>
 
-        {/* User List */}
         <div className="flex-1 overflow-y-auto">
           {isSearching ? (
             <div className="p-4">
@@ -345,11 +339,9 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
         </div>
       </div>
 
-      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {selectedUser ? (
           <>
-            {/* Chat Header */}
             <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
               <div className="flex items-center">
                 <button
@@ -364,7 +356,6 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
               </div>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
               {isLoading && messages.length === 0 ? (
                 <div className="flex justify-center items-center h-full">
@@ -393,7 +384,6 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
             <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
               {renderMediaPreview()}
               <form onSubmit={handleSendMessage} className="flex space-x-2">

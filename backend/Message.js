@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose'
 
 const messageSchema = new mongoose.Schema({
   sender: {
@@ -30,12 +30,10 @@ const messageSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
-});
+})
 
-// Create indexes for better query performance
-messageSchema.index({ sender: 1, recipient: 1 });
-messageSchema.index({ createdAt: -1 });
+messageSchema.index({ sender: 1, recipient: 1 })
 
-const Message = mongoose.model('Message', messageSchema);
+const Message = mongoose.model('Message', messageSchema)
 
-module.exports = Message;
+export default Message

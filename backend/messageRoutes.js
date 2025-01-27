@@ -1,18 +1,18 @@
-const express = require('express');
-const router = express.Router();
-const Message = require('./Message');
-const auth = require('./auth');
-const cloudinary = require('cloudinary').v2;
+import express from 'express'
+import multer from 'multer'
+import { v2 as cloudinary } from 'cloudinary'
+import Message from './Message.js'
+import { auth } from './auth.js'
 
-// Configure Cloudinary
+const router = express.Router()
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
-});
+})
 
-// Get messages between current user and another user
-router.get('/messages/:userId', auth, async (req, res) => {
+router.get('/:userId', auth, async (req, res) => {
   try {
     const messages = await Message.find({
       $or: [
@@ -21,64 +21,53 @@ router.get('/messages/:userId', auth, async (req, res) => {
       ]
     })
     .sort({ createdAt: 1 })
-    .populate('sender', 'username')
-    .populate('recipient', 'username');
+    .populate('sender recipient', 'username')
 
-    res.json(messages);
+    res.json(messages)
   } catch (error) {
-    console.error('Error fetching messages:', error);
-    res.status(500).json({ message: 'Error fetching messages' });
+    res.status(500).json({ error: error.message })
   }
-});
+})
 
-// Send a new message
-router.post('/messages', auth, async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
-    const { recipientId, content, media } = req.body;
-
-    let mediaUrl = null;
-    let mediaType = null;
-
-    // Handle media upload if present
-    if (media) {
-      try {
-        // Upload to Cloudinary
-        const result = await cloudinary.uploader.upload(media, {
-          resource_type: 'auto',
-          folder: 'chat-app'
-        });
-
-        mediaUrl = result.secure_url;
-        mediaType = result.resource_type === 'video' ? 'video' : 'image';
-      } catch (uploadError) {
-        console.error('Error uploading media:', uploadError);
-        return res.status(400).json({ message: 'Error uploading media' });
-      }
-    }
+    const { recipientId, content } = req.body
+    const { media } = req.files || {}
 
     const message = new Message({
       sender: req.user._id,
       recipient: recipientId,
-      content: content || '',
-      mediaUrl,
-      mediaType
-    });
+      content
+    })
 
-    await message.save();
+    if (media) {
+      try {
+        const result = await cloudinary.uploader.upload(media, {
+          resource_type: 'auto',
+          folder: 'chat-app'
+        })
 
-    // Populate sender and recipient info before sending response
-    await message.populate('sender', 'username');
-    await message.populate('recipient', 'username');
+        message.mediaUrl = result.secure_url
+        message.mediaType = result.resource_type
+      } catch (error) {
+        return res.status(400).json({ error: 'Failed to upload media' })
+      }
+    }
 
-    res.status(201).json(message);
+    await message.save()
+    await message.populate('sender', 'username')
+    await message.populate('recipient', 'username')
+
+    res.status(201).json({
+      status: 'success',
+      message
+    })
   } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ message: 'Error sending message' });
+    res.status(400).json({ error: error.message })
   }
-});
+})
 
-// Mark messages as read
-router.patch('/messages/read/:senderId', auth, async (req, res) => {
+router.patch('/read/:senderId', auth, async (req, res) => {
   try {
     await Message.updateMany(
       {
@@ -86,20 +75,15 @@ router.patch('/messages/read/:senderId', auth, async (req, res) => {
         recipient: req.user._id,
         read: false
       },
-      {
-        read: true
-      }
-    );
-
-    res.json({ message: 'Messages marked as read' });
+      { read: true }
+    )
+    res.json({ status: 'success' })
   } catch (error) {
-    console.error('Error marking messages as read:', error);
-    res.status(500).json({ message: 'Error marking messages as read' });
+    res.status(500).json({ error: error.message })
   }
-});
+})
 
-// Get recent chats (unique users the current user has messaged with)
-router.get('/messages/recent/chats', auth, async (req, res) => {
+router.get('/recent/chats', auth, async (req, res) => {
   try {
     const messages = await Message.find({
       $or: [
@@ -108,30 +92,28 @@ router.get('/messages/recent/chats', auth, async (req, res) => {
       ]
     })
     .sort({ createdAt: -1 })
-    .populate('sender', 'username')
-    .populate('recipient', 'username');
+    .populate('sender recipient', 'username')
 
-    // Get unique users from messages
-    const users = new Map();
+    const users = new Map()
+
     messages.forEach(message => {
-      const otherUser = message.sender._id.toString() === req.user._id.toString()
+      const otherUser = message.sender._id.equals(req.user._id)
         ? message.recipient
-        : message.sender;
-      
+        : message.sender
+
       if (!users.has(otherUser._id.toString())) {
         users.set(otherUser._id.toString(), {
           id: otherUser._id,
           username: otherUser.username,
           lastMessage: message
-        });
+        })
       }
-    });
+    })
 
-    res.json(Array.from(users.values()));
+    res.json([...users.values()])
   } catch (error) {
-    console.error('Error fetching recent chats:', error);
-    res.status(500).json({ message: 'Error fetching recent chats' });
+    res.status(500).json({ error: error.message })
   }
-});
+})
 
-module.exports = router;
+export default router
