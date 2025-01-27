@@ -51,8 +51,19 @@ router.post('/register', async (req, res) => {
       token
     })
   } catch (error) {
-    console.error('Registration error:', error)
-    res.status(500).json({ error: 'Server error during registration' })
+    console.error('Registration error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    })
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message })
+    }
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Username or email is already taken' })
+    }
+    res.status(500).json({ error: 'Server error during registration', details: error.message })
   }
 })
 

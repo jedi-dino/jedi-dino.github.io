@@ -44,12 +44,20 @@ const userSchema = new mongoose.Schema({
 })
 
 userSchema.pre('save', async function(next) {
-  const user = this
-  if (user.isModified('password')) {
-    const salt = await bcrypt.genSalt(10)
-    user.password = await bcrypt.hash(user.password, salt)
+  try {
+    const user = this
+    if (user.isModified('password')) {
+      const salt = await bcrypt.genSalt(10)
+      user.password = await bcrypt.hash(user.password, salt)
+    }
+    next()
+  } catch (error) {
+    console.error('Password hashing error:', {
+      message: error.message,
+      stack: error.stack
+    })
+    next(error)
   }
-  next()
 })
 
 userSchema.index({ username: 1 })

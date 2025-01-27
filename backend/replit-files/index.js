@@ -39,15 +39,20 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+try {
+  await mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  console.log('Connected to MongoDB')
+} catch (error) {
+  console.error('MongoDB connection error:', error)
+  process.exit(1)
+}
 
 const db = mongoose.connection
-db.on('error', console.error.bind(console, 'MongoDB connection error:'))
-db.once('open', () => {
-  console.log('Connected to MongoDB')
+db.on('error', (error) => {
+  console.error('MongoDB error:', error)
 })
 
 app.get('/health', (req, res) => {
