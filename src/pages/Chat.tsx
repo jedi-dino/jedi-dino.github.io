@@ -128,16 +128,6 @@ const Chat: React.FC<ChatProps> = ({ user, onLogout }) => {
     }
   }
 
-  const handleNewMessage = (message: Message) => {
-    if (selectedUser && message.sender._id === selectedUser.id) {
-      setMessages(prev => [...prev, message])
-    } else if (notificationPermission === 'granted') {
-      new Notification(`New message from ${message.sender.username}`, {
-        body: message.content
-      })
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <NotificationHandler onPermissionChange={setNotificationPermission} />
