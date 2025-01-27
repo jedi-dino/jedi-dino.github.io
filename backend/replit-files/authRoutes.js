@@ -36,13 +36,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Username or email is already taken' })
     }
 
-    const salt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, salt)
-
     const user = new User({
       username: username.toLowerCase(),
       email: email.toLowerCase(),
-      password: hashedPassword
+      password: password
     })
 
     await user.save()
