@@ -12,6 +12,14 @@ const userSchema = new mongoose.Schema({
     maxlength: 30,
     match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores']
   },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
+  },
   password: {
     type: String,
     required: true,
@@ -29,6 +37,10 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 })
+
+userSchema.index({ username: 1 })
+userSchema.index({ email: 1 })
+userSchema.index({ username: 'text', email: 'text' })
 
 userSchema.pre('save', async function(next) {
   const user = this

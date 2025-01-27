@@ -9,19 +9,20 @@ npm run build
 # navigate into the build output directory
 cd dist
 
+# create 404.html for client-side routing
+cp index.html 404.html
+
 # if you are deploying to a custom domain
 # echo 'www.example.com' > CNAME
 
-# create .nojekyll file to bypass Jekyll processing
-touch .nojekyll
-
-# initialize git repository if not already initialized
 git init
-git checkout -B main
 git add -A
 git commit -m 'deploy'
 
+# if you are deploying to https://<USERNAME>.github.io
+# git push -f git@github.com:<USERNAME>/<USERNAME>.github.io.git main
+
 # if you are deploying to https://<USERNAME>.github.io/<REPO>
-git push -f git@github.com:jedi-dino/test.github.io.git main:gh-pages
+git push -f git@github.com:<USERNAME>/<REPO>.git main:gh-pages
 
 cd -

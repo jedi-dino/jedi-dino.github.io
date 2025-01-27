@@ -1,7 +1,13 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_URL, ENDPOINTS, VALIDATION } from '../config'
-import { User } from '../types'
+
+interface User {
+  id: string
+  username: string
+  token: string
+  imageUrl?: string | undefined
+}
 
 interface RegisterProps {
   onRegister: (userData: User) => void
@@ -9,13 +15,14 @@ interface RegisterProps {
 
 const Register: React.FC<RegisterProps> = ({ onRegister }): JSX.Element => {
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   const validateForm = () => {
-    if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       setError('All fields are required')
       return false
     }
@@ -42,6 +49,11 @@ const Register: React.FC<RegisterProps> = ({ onRegister }): JSX.Element => {
       return false
     }
 
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setError('Please enter a valid email address')
+      return false
+    }
+
     return true
   }
 
@@ -58,7 +70,7 @@ const Register: React.FC<RegisterProps> = ({ onRegister }): JSX.Element => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, email, password })
       })
 
       let data
@@ -147,6 +159,21 @@ const Register: React.FC<RegisterProps> = ({ onRegister }): JSX.Element => {
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 focus:z-10 text-base dark:bg-gray-800"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>

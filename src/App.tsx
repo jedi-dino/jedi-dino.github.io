@@ -5,6 +5,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Chat from './pages/Chat'
 import Settings from './pages/Settings'
+import Home from './pages/Home'
+import Notes from './pages/Notes'
 
 import { User } from './types'
 
@@ -22,7 +24,6 @@ const App: React.FC = (): JSX.Element => {
     }
   }, [user])
 
-  // Initialize theme
   useEffect(() => {
     const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME)
     if (savedTheme === 'dark') {
@@ -30,14 +31,12 @@ const App: React.FC = (): JSX.Element => {
     } else if (savedTheme === 'light') {
       document.documentElement.classList.remove('dark')
     } else {
-      // Check system preference
       if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
         document.documentElement.classList.add('dark')
       } else {
         document.documentElement.classList.remove('dark')
       }
 
-      // Listen for system theme changes
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       const handleChange = (e: MediaQueryListEvent) => {
         if (e.matches) {
@@ -74,7 +73,7 @@ const App: React.FC = (): JSX.Element => {
           path="/"
           element={
             user ? (
-              <Navigate to="/chat" replace />
+              <Home user={user} onLogout={handleLogout} />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -84,7 +83,7 @@ const App: React.FC = (): JSX.Element => {
           path="/login"
           element={
             user ? (
-              <Navigate to="/chat" replace />
+              <Navigate to="/" replace />
             ) : (
               <Login onLogin={handleLogin} />
             )
@@ -94,7 +93,7 @@ const App: React.FC = (): JSX.Element => {
           path="/register"
           element={
             user ? (
-              <Navigate to="/chat" replace />
+              <Navigate to="/" replace />
             ) : (
               <Register onRegister={handleLogin} />
             )
@@ -105,6 +104,16 @@ const App: React.FC = (): JSX.Element => {
           element={
             user ? (
               <Chat user={user} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/notes"
+          element={
+            user ? (
+              <Notes user={user} onLogout={handleLogout} />
             ) : (
               <Navigate to="/login" replace />
             )

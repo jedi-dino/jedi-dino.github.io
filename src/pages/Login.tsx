@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_URL, ENDPOINTS, fetchWithRetry } from '../config'
-
 import { User } from '../types'
 
 interface LoginProps {
@@ -9,15 +8,15 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }): JSX.Element => {
-  const [username, setUsername] = useState('')
+  const [usernameOrEmail, setUsernameOrEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !password.trim()) {
-      setError('Please enter both username and password')
+    if (!usernameOrEmail.trim() || !password.trim()) {
+      setError('Please enter both username/email and password')
       return
     }
 
@@ -25,12 +24,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }): JSX.Element => {
     setError('')
 
     try {
-      console.log('Sending request to:', `${API_URL}${ENDPOINTS.AUTH.LOGIN}`)
       const response = await fetchWithRetry(
         `${API_URL}${ENDPOINTS.AUTH.LOGIN}`,
         {
           method: 'POST',
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ usernameOrEmail, password })
         }
       )
 
@@ -98,19 +96,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }): JSX.Element => {
           )}
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="username" className="sr-only">
-                Username
+              <label htmlFor="username-or-email" className="sr-only">
+                Username or Email
               </label>
               <input
-                id="username"
-                name="username"
+                id="username-or-email"
+                name="username-or-email"
                 type="text"
-                autoComplete="username"
+                autoComplete="username email"
                 required
-          className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 focus:z-10 text-base dark:bg-gray-800"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 focus:z-10 text-base dark:bg-gray-800"
+                placeholder="Username or Email"
+                value={usernameOrEmail}
+                onChange={(e) => setUsernameOrEmail(e.target.value)}
               />
             </div>
             <div>
@@ -123,7 +121,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }): JSX.Element => {
                 type="password"
                 autoComplete="current-password"
                 required
-          className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 focus:z-10 text-base dark:bg-gray-800"
+                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 focus:z-10 text-base dark:bg-gray-800"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -135,7 +133,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }): JSX.Element => {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <svg

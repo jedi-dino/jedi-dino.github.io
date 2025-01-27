@@ -1,4 +1,5 @@
 import express from 'express'
+import bcrypt from 'bcryptjs'
 import User from './User.js'
 import { generateToken } from './auth.js'
 
@@ -6,14 +7,19 @@ const router = express.Router()
 
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body
+    const { username, email, password } = req.body
 
-    const existingUser = await User.findOne({ username: username.toLowerCase() })
+    const existingUser = await User.findOne({
+      $or: [
+        { username: username.toLowerCase() },
+        { email: email.toLowerCase() }
+      ]
+    })
     if (existingUser) {
-      return res.status(400).json({ error: 'Username is already taken' })
+      return res.status(400).json({ error: 'Username or email is already taken' })
     }
 
-    const user = new User({ username, password })
+    const user = new User({ username, email, password })
     await user.save()
 
     const token = generateToken(user._id)
@@ -25,8 +31,24 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body
-    const user = await User.findByCredentials(username, password)
+    const { usernameOrEmail, password } = req.body
+
+    const user = await User.findOne({
+      $or: [
+        { username: usernameOrEmail.toLowerCase() },
+        { email: usernameOrEmail.toLowerCase() }
+      ]
+    })
+
+    if (!user) {
+      throw new Error('Invalid credentials')
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password)
+    if (!isMatch) {
+      throw new Error('Invalid credentials')
+    }
+
     const token = generateToken(user._id)
     res.json({ user, token })
   } catch (error) {

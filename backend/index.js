@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import authRoutes from './authRoutes.js'
 import userRoutes from './userRoutes.js'
 import messageRoutes from './messageRoutes.js'
+import noteRoutes from './noteRoutes.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -39,6 +40,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/messages', messageRoutes)
+app.use('/api/notes', noteRoutes)
 
 app.use((err, req, res, next) => {
   console.error(err.stack)
