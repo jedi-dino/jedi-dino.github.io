@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { API_URL, ENDPOINTS } from '../config'
+import { API_URL, ENDPOINTS, fetchWithRetry } from '../config'
 
 interface LoginProps {
   onLogin: (user: { id: string; username: string; token: string }) => void
@@ -24,7 +24,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     setLoading(true)
     try {
-      const response = await fetch(`${API_URL}${ENDPOINTS.AUTH.LOGIN}`, {
+      const response = await fetchWithRetry(`${API_URL}${ENDPOINTS.AUTH.LOGIN}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -35,16 +35,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         })
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to login')
+        const data = await response.json()
+        setError(data.error || 'Failed to login')
+        return
       }
 
+      const data = await response.json()
       onLogin(data)
       navigate('/')
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to login')
+      console.error('Login error:', error)
+      setError('Failed to connect to server')
     } finally {
       setLoading(false)
     }

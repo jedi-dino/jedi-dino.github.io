@@ -54,8 +54,7 @@ export const ENDPOINTS = {
 
 export const fetchWithRetry = async (url: string, options: RequestInit = {}, retries = 3): Promise<Response> => {
   const defaultHeaders = {
-    'Content-Type': 'application/json',
-    'Origin': 'https://jedi-dino.github.io'
+    'Content-Type': 'application/json'
   }
 
   const mergedOptions = {
@@ -64,23 +63,21 @@ export const fetchWithRetry = async (url: string, options: RequestInit = {}, ret
       ...defaultHeaders,
       ...options.headers
     },
-    credentials: 'include' as RequestCredentials
+    credentials: 'include' as RequestCredentials,
+    mode: 'cors' as RequestMode
   }
 
-  let lastError: Error | null = null
   for (let i = 0; i < retries; i++) {
     try {
+      console.log(`Attempt ${i + 1}: Sending request to ${url}`)
       const response = await fetch(url, mergedOptions)
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Request failed')
-      }
+      console.log(`Attempt ${i + 1}: Response status:`, response.status)
       return response
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Request failed')
-      if (i === retries - 1) break
+      console.error(`Attempt ${i + 1}: Error:`, error)
+      if (i === retries - 1) throw error
       await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)))
     }
   }
-  throw lastError
+  throw new Error('Failed after all retries')
 }

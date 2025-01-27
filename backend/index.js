@@ -3,6 +3,9 @@ import mongoose from 'mongoose'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
+
+dotenv.config()
 import authRoutes from './authRoutes.js'
 import userRoutes from './userRoutes.js'
 import messageRoutes from './messageRoutes.js'
@@ -29,9 +32,19 @@ const corsOptions = {
 
 app.use(cors(corsOptions))
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 app.use('/api/users/uploads', express.static(path.join(__dirname, 'uploads')))
 
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+
+const db = mongoose.connection
+db.on('error', console.error.bind(console, 'MongoDB connection error:'))
+db.once('open', () => {
+  console.log('Connected to MongoDB')
+})
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' })

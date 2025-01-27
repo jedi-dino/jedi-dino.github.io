@@ -1,16 +1,39 @@
 import express from 'express'
 import multer from 'multer'
-import { v2 as cloudinary } from 'cloudinary'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import Message from './Message.js'
 import { auth } from './auth.js'
 
-const router = express.Router()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+const storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, path.join(__dirname, 'uploads'))
+  },
+  filename: function(req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, uniqueSuffix + path.extname(file.originalname))
+  }
 })
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function(req, file, cb) {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true)
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG and GIF images are allowed.'))
+    }
+  }
+})
+
+const router = express.Router()
 
 router.get('/:userId', auth, async (req, res) => {
   try {
@@ -29,10 +52,9 @@ router.get('/:userId', auth, async (req, res) => {
   }
 })
 
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, upload.single('media'), async (req, res) => {
   try {
     const { recipientId, content } = req.body
-    const { media } = req.files || {}
 
     const message = new Message({
       sender: req.user._id,
@@ -40,23 +62,13 @@ router.post('/', auth, async (req, res) => {
       content
     })
 
-    if (media) {
-      try {
-        const result = await cloudinary.uploader.upload(media, {
-          resource_type: 'auto',
-          folder: 'chat-app'
-        })
-
-        message.mediaUrl = result.secure_url
-        message.mediaType = result.resource_type
-      } catch (error) {
-        return res.status(400).json({ error: 'Failed to upload media' })
-      }
+    if (req.file) {
+      message.mediaType = req.file.mimetype.startsWith('image/') ? 'image' : 'video'
+      message.mediaUrl = `/uploads/${req.file.filename}`
     }
 
     await message.save()
-    await message.populate('sender', 'username')
-    await message.populate('recipient', 'username')
+    await message.populate('sender recipient', 'username')
 
     res.status(201).json({
       status: 'success',
