@@ -15,26 +15,17 @@ const __dirname = path.dirname(__filename)
 
 const app = express()
 
-const corsOptions = {
-  origin: (origin, callback) => {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://192.168.68.72:5173',
-      'https://jedi-dino.github.io'
-    ]
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  },
+app.use(cors({
+  origin: true, // Allow all origins temporarily for debugging
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Origin']
-}
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
+  exposedHeaders: ['Content-Length', 'X-Requested-With'],
+  maxAge: 86400 // 24 hours
+}))
 
-app.use(cors(corsOptions))
+// Handle preflight requests
+app.options('*', cors())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
@@ -42,11 +33,21 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 try {
   await mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    family: 4,
+    retryWrites: true,
+    retryReads: true
   })
   console.log('Connected to MongoDB')
 } catch (error) {
-  console.error('MongoDB connection error:', error)
+  console.error('MongoDB connection error:', {
+    message: error.message,
+    code: error.code,
+    name: error.name,
+    stack: error.stack
+  })
   process.exit(1)
 }
 

@@ -86,7 +86,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
 
-    const isMatch = await bcrypt.compare(password, user.password)
+    const isMatch = await user.comparePassword(password)
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
@@ -98,8 +98,16 @@ router.post('/login', async (req, res) => {
       token
     })
   } catch (error) {
-    console.error('Login error:', error)
-    res.status(500).json({ error: 'Server error during login' })
+    console.error('Login error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    })
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message })
+    }
+    res.status(500).json({ error: 'Server error during login', details: error.message })
   }
 })
 

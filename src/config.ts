@@ -63,8 +63,9 @@ export const fetchWithRetry = async (url: string, options: RequestInit = {}, ret
       ...defaultHeaders,
       ...options.headers
     },
-    credentials: 'include' as RequestCredentials,
-    mode: 'cors' as RequestMode
+    credentials: 'same-origin' as RequestCredentials,
+    mode: 'cors' as RequestMode,
+    cache: 'no-cache' as RequestCache
   }
 
   for (let i = 0; i < retries; i++) {

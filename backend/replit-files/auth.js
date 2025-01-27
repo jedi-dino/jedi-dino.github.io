@@ -2,10 +2,24 @@ import jwt from 'jsonwebtoken'
 import User from './User.js'
 
 export const generateToken = (userId) => {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET is not defined')
+  try {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is not defined')
+    }
+    const token = jwt.sign(
+      { _id: userId.toString() },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d', algorithm: 'HS256' }
+    )
+    return token
+  } catch (error) {
+    console.error('Token generation error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    })
+    throw error
   }
-  return jwt.sign({ _id: userId }, process.env.JWT_SECRET, { expiresIn: '7d' })
 }
 
 export const auth = async (req, res, next) => {

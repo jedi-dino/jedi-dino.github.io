@@ -1,3 +1,4 @@
+
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 
@@ -59,6 +60,18 @@ userSchema.pre('save', async function(next) {
     next(error)
   }
 })
+
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  try {
+    return await bcrypt.compare(candidatePassword, this.password)
+  } catch (error) {
+    console.error('Password comparison error:', {
+      message: error.message,
+      stack: error.stack
+    })
+    throw error
+  }
+}
 
 userSchema.index({ username: 1 })
 userSchema.index({ email: 1 })
