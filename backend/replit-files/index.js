@@ -17,18 +17,19 @@ const app = express()
 
 const corsOptions = {
   origin: [
-    'http://localhost:5174',
     'http://localhost:5173',
+    'http://localhost:5174',
     'https://jedi-dino.github.io'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin']
 }
 
 app.use(cors(corsOptions))
 app.use(express.json())
-app.use('/api/users/uploads', express.static(path.join(__dirname, 'uploads')))
+app.use(express.urlencoded({ extended: true }))
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,

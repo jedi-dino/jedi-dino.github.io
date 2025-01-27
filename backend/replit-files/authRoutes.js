@@ -9,29 +9,63 @@ router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body
 
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'All fields are required' })
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      return res.status(400).json({ error: 'Username can only contain letters, numbers, and underscores, and must be between 3 and 30 characters' })
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' })
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' })
+    }
+
     const existingUser = await User.findOne({
       $or: [
         { username: username.toLowerCase() },
         { email: email.toLowerCase() }
       ]
     })
+
     if (existingUser) {
       return res.status(400).json({ error: 'Username or email is already taken' })
     }
 
-    const user = new User({ username, email, password })
+    const salt = await bcrypt.genSalt(10)
+    const hashedPassword = await bcrypt.hash(password, salt)
+
+    const user = new User({
+      username: username.toLowerCase(),
+      email: email.toLowerCase(),
+      password: hashedPassword
+    })
+
     await user.save()
 
     const token = generateToken(user._id)
-    res.status(201).json({ user, token })
+    res.status(201).json({
+      id: user._id,
+      username: user.username,
+      token
+    })
   } catch (error) {
-    res.status(400).json({ error: error.message })
+    console.error('Registration error:', error)
+    res.status(500).json({ error: 'Server error during registration' })
   }
 })
 
 router.post('/login', async (req, res) => {
   try {
     const { usernameOrEmail, password } = req.body
+
+    if (!usernameOrEmail || !password) {
+      return res.status(400).json({ error: 'All fields are required' })
+    }
 
     const user = await User.findOne({
       $or: [
@@ -41,18 +75,23 @@ router.post('/login', async (req, res) => {
     })
 
     if (!user) {
-      throw new Error('Invalid credentials')
+      return res.status(401).json({ error: 'Invalid credentials' })
     }
 
     const isMatch = await bcrypt.compare(password, user.password)
     if (!isMatch) {
-      throw new Error('Invalid credentials')
+      return res.status(401).json({ error: 'Invalid credentials' })
     }
 
     const token = generateToken(user._id)
-    res.json({ user, token })
+    res.json({
+      id: user._id,
+      username: user.username,
+      token
+    })
   } catch (error) {
-    res.status(401).json({ error: 'Invalid credentials' })
+    console.error('Login error:', error)
+    res.status(500).json({ error: 'Server error during login' })
   }
 })
 

@@ -23,8 +23,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    minlength: 8,
-    maxlength: 100
+    minlength: 8
   },
   imageUrl: {
     type: String,
@@ -35,38 +34,18 @@ const userSchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    transform: function(doc, ret) {
+      delete ret.password
+      return ret
+    }
+  }
 })
 
 userSchema.index({ username: 1 })
 userSchema.index({ email: 1 })
 userSchema.index({ username: 'text', email: 'text' })
-
-userSchema.pre('save', async function(next) {
-  const user = this
-  if (user.isModified('password')) {
-    user.password = await bcrypt.hash(user.password, 8)
-  }
-  next()
-})
-
-userSchema.methods.toJSON = function() {
-  const user = this.toObject()
-  delete user.password
-  return user
-}
-
-userSchema.statics.findByCredentials = async (username, password) => {
-  const user = await User.findOne({ username: username.toLowerCase() })
-  if (!user) {
-    throw new Error('Invalid credentials')
-  }
-  const isMatch = await bcrypt.compare(password, user.password)
-  if (!isMatch) {
-    throw new Error('Invalid credentials')
-  }
-  return user
-}
 
 const User = mongoose.model('User', userSchema)
 
