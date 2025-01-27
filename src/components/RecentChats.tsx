@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { API_URL, ENDPOINTS } from '../config'
 
-interface ChatUser {
+interface User {
   id: string
   username: string
+  token: string
 }
 
 interface Message {
@@ -29,24 +29,22 @@ interface RecentChat {
 }
 
 interface RecentChatsProps {
-  token: string
-  currentUserId: string
+  user: User
   selectedUserId?: string
-  onSelectUser: (user: ChatUser) => void
+  onSelectUser: (user: { id: string; username: string }) => void
 }
 
-const RecentChats: React.FC<RecentChatsProps> = ({ token, currentUserId, selectedUserId, onSelectUser }) => {
+const RecentChats: React.FC<RecentChatsProps> = ({ user, selectedUserId, onSelectUser }) => {
   const [chats, setChats] = useState<RecentChat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const navigate = useNavigate()
 
   useEffect(() => {
     const fetchRecentChats = async () => {
       try {
         const response = await fetch(`${API_URL}${ENDPOINTS.MESSAGES.RECENT_CHATS}`, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${user.token}`
           }
         })
 
@@ -64,7 +62,7 @@ const RecentChats: React.FC<RecentChatsProps> = ({ token, currentUserId, selecte
     }
 
     fetchRecentChats()
-  }, [token])
+  }, [user])
 
   if (loading) {
     return (
@@ -110,7 +108,7 @@ const RecentChats: React.FC<RecentChatsProps> = ({ token, currentUserId, selecte
               </p>
             )}
           </div>
-          {chat.lastMessage && !chat.lastMessage.read && chat.lastMessage.sender._id !== currentUserId && (
+          {chat.lastMessage && !chat.lastMessage.read && chat.lastMessage.sender._id !== user.id && (
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
           )}
         </div>

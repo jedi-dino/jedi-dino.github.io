@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { API_URL, ENDPOINTS, STORAGE_KEYS } from '../config'
+import { API_URL, ENDPOINTS } from '../config'
 import UserMenu from '../components/UserMenu'
 import ThemeToggle from '../components/ThemeToggle'
 

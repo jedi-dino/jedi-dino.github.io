@@ -1,14 +1,20 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import UserSearch from '../components/UserSearch'
-import UserMenu from '../components/UserMenu'
-import RecentChats from '../components/RecentChats'
-import VideoPlayer from '../components/VideoPlayer'
-import ThemeToggle from '../components/ThemeToggle'
-import NotificationHandler, { showNotification } from '../components/NotificationHandler'
+import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { API_URL, ENDPOINTS } from '../config'
+import UserMenu from '../components/UserMenu'
+import ThemeToggle from '../components/ThemeToggle'
+import UserSearch from '../components/UserSearch'
+import RecentChats from '../components/RecentChats'
+
+interface User {
+  id: string
+  username: string
+  token: string
+}
 
 interface Message {
   _id: string
+  content: string
   sender: {
     _id: string
     username: string
@@ -17,11 +23,8 @@ interface Message {
     _id: string
     username: string
   }
-  content: string
-  mediaType: 'image' | 'video' | null
-  mediaUrl: string | null
-  createdAt: string
   read: boolean
+  createdAt: string
 }
 
 interface ChatUser {
@@ -30,412 +33,209 @@ interface ChatUser {
 }
 
 interface ChatProps {
-  user: {
-    id: string
-    username: string
-    token: string
-  }
+  user: User
   onLogout: () => void
 }
 
-const Chat: React.FC<ChatProps> = ({ user, onLogout }): JSX.Element => {
+const Chat: React.FC<ChatProps> = ({ user, onLogout }) => {
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
-  const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
-  const [mediaPreview, setMediaPreview] = useState<string>('')
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
-  const [showSidebar, setShowSidebar] = useState(true)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const pollInterval = useRef<number | null>(null)
-  const isInitialLoad = useRef(true)
-  const previousMessagesLength = useRef(0)
+  const navigate = useNavigate()
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  useEffect(() => {
+    if (selectedUser) {
+      fetchMessages()
+    }
+  }, [selectedUser])
 
   useEffect(() => {
     scrollToBottom()
   }, [messages])
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('selectedChatUser')
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser)
-        setSelectedUser(parsedUser)
-        isInitialLoad.current = true
-        if (window.innerWidth < 768) {
-          setShowSidebar(false)
-        }
-      } catch (error) {
-        console.error('Error parsing saved user:', error)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (selectedUser) {
-      localStorage.setItem('selectedChatUser', JSON.stringify(selectedUser))
-      
-      if (isInitialLoad.current) {
-        fetchMessages()
-        isInitialLoad.current = false
-      }
-
-      pollInterval.current = window.setInterval(fetchMessages, 5000)
-    }
-
-    return () => {
-      if (pollInterval.current) {
-        window.clearInterval(pollInterval.current)
-      }
-    }
-  }, [selectedUser])
-
-  useEffect(() => {
-    if (messages.length > previousMessagesLength.current) {
-      const newMessages = messages.slice(previousMessagesLength.current)
-      newMessages.forEach(message => {
-        if (message.sender._id !== user.id && !document.hasFocus()) {
-          showNotification(
-            `New message from ${message.sender.username}`,
-            {
-              body: message.content || (message.mediaType ? `Sent a ${message.mediaType}` : ''),
-              tag: `message-${message._id}`,
-              requireInteraction: true
-            }
-          )
-        }
-      })
-    }
-    previousMessagesLength.current = messages.length
-  }, [messages, user.id])
-
-  const handlePermissionChange = useCallback((permission: NotificationPermission) => {
-    setNotificationPermission(permission)
-  }, [])
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   const fetchMessages = async () => {
     if (!selectedUser) return
 
-    setIsLoading(true)
     try {
-      const response = await fetch(
-        `${API_URL}${ENDPOINTS.MESSAGES.GET}/${selectedUser.id}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-            'Content-Type': 'application/json'
-          }
+      const response = await fetch(`${API_URL}${ENDPOINTS.MESSAGES.GET}/${selectedUser.id}`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`
         }
-      )
+      })
 
       if (!response.ok) {
         throw new Error('Failed to fetch messages')
       }
 
       const data = await response.json()
-      setMessages(Array.isArray(data) ? data : [])
+      setMessages(data)
+
+      // Mark messages as read
+      if (data.length > 0) {
+        const lastMessage = data[data.length - 1]
+        if (!lastMessage.read && lastMessage.sender._id === selectedUser.id) {
+          await fetch(`${API_URL}${ENDPOINTS.MESSAGES.READ}/${selectedUser.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${user.token}`
+            }
+          })
+        }
+      }
     } catch (error) {
-      console.error('Error fetching messages:', error)
-    } finally {
-      setIsLoading(false)
+      setError(error instanceof Error ? error.message : 'Failed to fetch messages')
     }
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File must be less than 10MB')
-      return
-    }
-
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      alert('File must be an image or video')
-      return
-    }
-
-    setSelectedMedia(file)
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const result = e.target?.result
-      if (typeof result === 'string') {
-        setMediaPreview(result)
-      }
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const clearMedia = () => {
-    setSelectedMedia(null)
-    setMediaPreview('')
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  const handleSendMessage = async (e: React.FormEvent): Promise<void> => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedUser) return
-    if (!newMessage.trim() && !selectedMedia) {
-      alert('Please enter a message or select a file')
-      return
-    }
+    if (!selectedUser || !newMessage.trim()) return
 
+    setLoading(true)
     try {
-      const formData = new FormData()
-      formData.append('recipientId', selectedUser.id)
-      if (newMessage.trim()) {
-        formData.append('content', newMessage.trim())
-      }
-      if (selectedMedia) {
-        formData.append('media', selectedMedia)
-      }
-
       const response = await fetch(`${API_URL}${ENDPOINTS.MESSAGES.SEND}`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: formData
+        body: JSON.stringify({
+          recipientId: selectedUser.id,
+          content: newMessage
+        })
       })
 
-      const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to send message')
+        throw new Error('Failed to send message')
       }
 
-      if (data.status === 'success' && data.message) {
-        setMessages((prev) => [...prev, data.message])
-        setNewMessage('')
-        clearMedia()
-      } else {
-        throw new Error(data.message || 'Failed to send message')
-      }
+      const data = await response.json()
+      setMessages(prev => [...prev, data.message])
+      setNewMessage('')
     } catch (error) {
-      console.error('Error sending message:', error)
-      alert('Failed to send message. Please try again.')
+      setError(error instanceof Error ? error.message : 'Failed to send message')
+    } finally {
+      setLoading(false)
     }
-  }
-
-  const handleSelectUser = (chatUser: ChatUser) => {
-    setSelectedUser(chatUser)
-    setMessages([])
-    setIsSearching(false)
-    isInitialLoad.current = true
-    if (window.innerWidth < 768) {
-      setShowSidebar(false)
-    }
-  }
-
-  const renderMessageContent = (message: Message) => {
-    return (
-      <div>
-        {message.content && <p className="mb-2">{message.content}</p>}
-        {message.mediaUrl && (
-          <div className="mt-2">
-            {message.mediaType === 'image' ? (
-              <img 
-                src={`${API_URL}${message.mediaUrl}`}
-                alt="Message attachment" 
-                className="max-w-[200px] md:max-w-xs rounded-lg cursor-pointer"
-                onClick={() => window.open(`${API_URL}${message.mediaUrl}`, '_blank')}
-              />
-            ) : message.mediaType === 'video' && message.mediaUrl ? (
-              <div className="max-w-[200px] md:max-w-xs rounded-lg overflow-hidden">
-                <VideoPlayer src={`${API_URL}${message.mediaUrl}`} />
-              </div>
-            ) : null}
-          </div>
-        )}
-        <p className={`text-xs mt-1 ${
-          message.sender._id === user.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
-        }`}>
-          {new Date(message.createdAt).toLocaleTimeString()}
-        </p>
-      </div>
-    )
-  }
-
-  const renderMediaPreview = () => {
-    if (!mediaPreview || !selectedMedia) return null
-
-    return (
-      <div className="mb-4 relative inline-block">
-        {selectedMedia.type.startsWith('image/') ? (
-          <img 
-            src={mediaPreview}
-            alt="Upload preview" 
-            className="max-h-32 rounded-lg"
-          />
-        ) : selectedMedia.type.startsWith('video/') ? (
-          <div className="max-h-32 rounded-lg overflow-hidden">
-            <VideoPlayer src={mediaPreview} />
-          </div>
-        ) : null}
-        <button
-          onClick={clearMedia}
-          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-    )
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-100 dark:bg-gray-900">
-      <NotificationHandler onPermissionChange={handlePermissionChange} />
-      <div 
-        className={`${
-          showSidebar ? 'flex' : 'hidden'
-        } md:flex flex-col w-full md:w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700`}
-      >
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Messages</h2>
-            <div className="flex items-center space-x-2">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <nav className="bg-white dark:bg-gray-800 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <button
+                onClick={() => navigate('/')}
+                className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
+              <h1 className="ml-4 text-2xl font-bold text-gray-900 dark:text-white">Chat</h1>
+            </div>
+            <div className="flex items-center space-x-4">
               <ThemeToggle />
               <UserMenu user={user} onLogout={onLogout} />
             </div>
           </div>
-          <div className="mt-4">
-            <button
-              onClick={() => setIsSearching(!isSearching)}
-              className="btn btn-secondary w-full dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-            >
-              {isSearching ? '← Back to Chats' : 'Start New Chat'}
-            </button>
-          </div>
         </div>
+      </nav>
 
-        <div className="flex-1 overflow-y-auto">
-          {isSearching ? (
-            <div className="p-4">
-              <UserSearch 
-                onSelectUser={handleSelectUser} 
-                currentUserId={user.id}
-                token={user.token}
-              />
-            </div>
-          ) : (
-            <RecentChats
-              token={user.token}
-              currentUserId={user.id}
-              onSelectUser={handleSelectUser}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 space-y-4">
+            <UserSearch
+              user={user}
+              onSelectUser={setSelectedUser}
               selectedUserId={selectedUser?.id}
             />
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col">
-        {selectedUser ? (
-          <>
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
-              <div className="flex items-center">
-                <button
-                  onClick={() => setShowSidebar(true)}
-                  className="md:hidden mr-4 text-gray-600 dark:text-gray-300"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedUser.username}</h3>
-              </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Chats</h2>
+              <RecentChats
+                user={user}
+                onSelectUser={setSelectedUser}
+                selectedUserId={selectedUser?.id}
+              />
             </div>
+          </div>
 
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
-              {isLoading && messages.length === 0 ? (
-                <div className="flex justify-center items-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="md:col-span-2">
+            {selectedUser ? (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm h-[600px] flex flex-col">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                    {selectedUser.username}
+                  </h2>
                 </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message._id}
-                    className={`mb-4 flex ${
-                      message.sender._id === user.id ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {messages.map(message => (
                     <div
-                      className={`max-w-[75%] md:max-w-md px-4 py-2 rounded-lg ${
-                        message.sender._id === user.id
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
+                      key={message._id}
+                      className={`flex ${
+                        message.sender._id === user.id ? 'justify-end' : 'justify-start'
                       }`}
                     >
-                      {renderMessageContent(message)}
+                      <div
+                        className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                          message.sender._id === user.id
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                        }`}
+                      >
+                        <p>{message.content}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {new Date(message.createdAt).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
 
-            <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-              {renderMediaPreview()}
-              <form onSubmit={handleSendMessage} className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="input flex-1 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400 text-base"
-                />
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  accept="image/*,video/*"
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn btn-secondary dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 p-2"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </button>
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim() && !selectedMedia}
-                  className="btn btn-primary dark:hover:bg-blue-700 p-2"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </button>
-              </form>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-            <button
-              onClick={() => setShowSidebar(true)}
-              className="md:hidden absolute top-4 left-4 text-gray-600 dark:text-gray-300"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <p className="text-gray-500 dark:text-gray-400">Select a user to start chatting</p>
+                <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 dark:border-gray-700">
+                  {error && (
+                    <div className="mb-4 text-red-500 dark:text-red-400 text-sm">
+                      {error}
+                    </div>
+                  )}
+                  <div className="flex space-x-4">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type a message..."
+                      className="flex-1 input"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading || !newMessage.trim()}
+                      className="btn btn-primary"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm h-[600px] flex items-center justify-center">
+                <p className="text-gray-500 dark:text-gray-400">
+                  Select a user to start chatting
+                </p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </main>
     </div>
   )
 }

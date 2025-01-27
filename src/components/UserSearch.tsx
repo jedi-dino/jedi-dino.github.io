@@ -1,110 +1,106 @@
 import React, { useState } from 'react'
 import { API_URL, ENDPOINTS } from '../config'
-import ProfilePicture from './ProfilePicture'
 
 interface User {
   id: string
   username: string
-  imageUrl?: string
-}
-
-interface UserSearchProps {
-  onSelectUser: (user: { id: string; username: string; imageUrl?: string }) => void
-  currentUserId: string
   token: string
 }
 
-const UserSearch: React.FC<UserSearchProps> = ({ onSelectUser, currentUserId, token }): JSX.Element => {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [users, setUsers] = useState<User[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+interface SearchResult {
+  _id: string
+  username: string
+}
+
+interface UserSearchProps {
+  user: User
+  selectedUserId?: string
+  onSelectUser: (user: { id: string; username: string }) => void
+}
+
+const UserSearch: React.FC<UserSearchProps> = ({ user, selectedUserId, onSelectUser }) => {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value
-    setSearchTerm(term)
+    const value = e.target.value
+    setQuery(value)
 
-    if (!term.trim()) {
-      setUsers([])
+    if (!value.trim()) {
+      setResults([])
       return
     }
 
-    setIsLoading(true)
-    setError('')
-
+    setLoading(true)
     try {
-      const response = await fetch(
-        `${API_URL}${ENDPOINTS.USERS.SEARCH}?query=${encodeURIComponent(term)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+      const response = await fetch(`${API_URL}${ENDPOINTS.USERS.SEARCH}?username=${value}`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`
         }
-      )
+      })
 
       if (!response.ok) {
         throw new Error('Failed to search users')
       }
 
       const data = await response.json()
-      if (data.status === 'success' && Array.isArray(data.users)) {
-        setUsers(data.users.filter((user: User) => user.id !== currentUserId))
-      } else {
-        setUsers([])
-      }
+      setResults(data)
+      setError('')
     } catch (error) {
-      setError('Failed to search users')
-      console.error('Error searching users:', error)
+      setError(error instanceof Error ? error.message : 'Failed to search users')
+      setResults([])
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  return (
-    <div>
-      <div className="relative">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={handleSearch}
-          placeholder="Search users..."
-          className="input w-full"
-        />
-        {isLoading && (
-          <div className="absolute right-3 top-2">
-            <div className="spinner h-6 w-6"></div>
-          </div>
-        )}
-      </div>
+  const handleSelectUser = (result: SearchResult) => {
+    onSelectUser({ id: result._id, username: result.username })
+    setQuery('')
+    setResults([])
+  }
 
-      {error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={handleSearch}
+        placeholder="Search users..."
+        className="input"
+      />
+
+      {loading && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+        </div>
       )}
 
-      <div className="mt-4 space-y-2">
-        {users.map((user) => (
-          <button
-            key={user.id}
-            onClick={() => onSelectUser(user)}
-            className="w-full flex items-center p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <ProfilePicture 
-              username={user.username} 
-              imageUrl={user.imageUrl ? `${API_URL}${user.imageUrl}` : undefined}
-              size="sm" 
-            />
-            <span className="ml-3 text-gray-900 dark:text-white">
-              {user.username}
-            </span>
-          </button>
-        ))}
-        {searchTerm && !isLoading && users.length === 0 && (
-          <p className="text-center text-gray-500 dark:text-gray-400">
-            No users found
-          </p>
-        )}
-      </div>
+      {error && (
+        <div className="mt-2 text-red-500 dark:text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      {results.length > 0 && (
+        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg">
+          <ul className="max-h-60 overflow-auto">
+            {results.map(result => (
+              <li
+                key={result._id}
+                onClick={() => handleSelectUser(result)}
+                className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer ${
+                  selectedUserId === result._id ? 'bg-gray-100 dark:bg-gray-700' : ''
+                }`}
+              >
+                {result.username}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
