@@ -4,6 +4,12 @@ export const STORAGE_KEYS = {
   THEME: 'theme'
 }
 
+export const THEMES = {
+  LIGHT: 'light',
+  DARK: 'dark',
+  SYSTEM: 'system'
+}
+
 export const VALIDATION = {
   USERNAME: {
     MIN_LENGTH: 3,
@@ -33,6 +39,7 @@ export const ENDPOINTS = {
     GET: '/api/messages',
     SEND: '/api/messages',
     READ: '/api/messages/read',
+    RECENT: '/api/messages/recent/chats',
     RECENT_CHATS: '/api/messages/recent/chats'
   },
   NOTES: {
