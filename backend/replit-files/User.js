@@ -1,80 +1,73 @@
-const mongoose = require('mongoose')
+import mongoose from 'mongoose'
+import bcrypt from 'bcryptjs'
 
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
-    required: [true, 'Username is required'],
+    required: true,
     unique: true,
     trim: true,
-    minlength: [3, 'Username must be at least 3 characters long'],
-    maxlength: [20, 'Username cannot exceed 20 characters'],
-    match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'],
-    set: v => v.toLowerCase() // Convert username to lowercase before saving
+    lowercase: true,
+    minlength: 3,
+    maxlength: 30,
+    match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores']
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
   },
   password: {
     type: String,
-    required: [true, 'Password is required']
+    required: true,
+    minlength: 8,
+    maxlength: 100
   },
   imageUrl: {
     type: String,
     default: null
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
   },
   lastActive: {
     type: Date,
     default: Date.now
   }
 }, {
-  timestamps: true,
-  toJSON: {
-    transform: function(doc, ret) {
-      ret.id = ret._id.toString()
-      delete ret._id
-      delete ret.__v
-      delete ret.password
-      return ret
-    }
-  }
+  timestamps: true
 })
 
-// Update lastActive timestamp before saving
-userSchema.pre('save', function(next) {
-  this.lastActive = new Date()
+userSchema.index({ username: 1 })
+userSchema.index({ email: 1 })
+userSchema.index({ username: 'text', email: 'text' })
+
+userSchema.pre('save', async function(next) {
+  const user = this
+  if (user.isModified('password')) {
+    user.password = await bcrypt.hash(user.password, 8)
+  }
   next()
 })
 
-// Custom error messages for unique fields
-userSchema.post('save', function(error, doc, next) {
-  if (error.name === 'MongoServerError' && error.code === 11000) {
-    next(new Error('Username already exists'))
-  } else {
-    next(error)
-  }
-})
-
-// Instance method to safely convert user to JSON
 userSchema.methods.toJSON = function() {
-  const obj = this.toObject()
-  obj.id = obj._id.toString()
-  delete obj._id
-  delete obj.__v
-  delete obj.password
-  return obj
+  const user = this.toObject()
+  delete user.password
+  return user
 }
 
-// Static method to find user by username
-userSchema.statics.findByUsername = async function(username) {
-  return this.findOne({ username })
-}
-
-// Static method to validate password length
-userSchema.statics.validatePassword = function(password) {
-  return password && password.length >= 6 && password.length <= 50
+userSchema.statics.findByCredentials = async (username, password) => {
+  const user = await User.findOne({ username: username.toLowerCase() })
+  if (!user) {
+    throw new Error('Invalid credentials')
+  }
+  const isMatch = await bcrypt.compare(password, user.password)
+  if (!isMatch) {
+    throw new Error('Invalid credentials')
+  }
+  return user
 }
 
 const User = mongoose.model('User', userSchema)
 
-module.exports = User
+export default User
