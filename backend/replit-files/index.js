@@ -15,17 +15,21 @@ const __dirname = path.dirname(__filename)
 
 const app = express()
 
-app.use(cors({
-  origin: true, // Allow all origins temporarily for debugging
+// Enable CORS for all routes
+// Configure CORS
+const corsOptions = {
+  origin: true, // Allow all origins
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
-  exposedHeaders: ['Content-Length', 'X-Requested-With'],
-  maxAge: 86400 // 24 hours
-}))
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
 
 // Handle preflight requests
-app.options('*', cors())
+app.options('*', cors(corsOptions));
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))

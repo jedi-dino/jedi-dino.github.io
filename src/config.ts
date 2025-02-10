@@ -1,4 +1,6 @@
-export const API_URL = 'https://testserverprobsfail.replit.app'
+export const API_URL = import.meta.env.PROD 
+  ? 'https://testserverprobsfail.replit.app'
+  : 'http://localhost:3001'
 
 export const STORAGE_KEYS = {
   THEME: 'theme'
@@ -63,7 +65,7 @@ export const fetchWithRetry = async (url: string, options: RequestInit = {}, ret
       ...defaultHeaders,
       ...options.headers
     },
-    credentials: 'same-origin' as RequestCredentials,
+    credentials: 'include' as RequestCredentials,
     mode: 'cors' as RequestMode,
     cache: 'no-cache' as RequestCache
   }

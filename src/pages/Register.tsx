@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { API_URL, ENDPOINTS, VALIDATION } from '../config'
+import { API_URL, ENDPOINTS, VALIDATION, fetchWithRetry } from '../config'
 
 interface RegisterProps {
   onRegister: (user: { id: string; username: string; token: string }) => void
@@ -46,11 +46,14 @@ const Register: React.FC<RegisterProps> = ({ onRegister }) => {
 
     setLoading(true)
     try {
-      const response = await fetch(`${API_URL}${ENDPOINTS.AUTH.REGISTER}`, {
+      console.log('Sending registration request:', {
+        url: `${API_URL}${ENDPOINTS.AUTH.REGISTER}`,
+        username,
+        email
+      })
+
+      const response = await fetchWithRetry(`${API_URL}${ENDPOINTS.AUTH.REGISTER}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           username,
           email,
@@ -58,7 +61,9 @@ const Register: React.FC<RegisterProps> = ({ onRegister }) => {
         })
       })
 
+      console.log('Registration response status:', response.status)
       const data = await response.json()
+      console.log('Registration response data:', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to register')
@@ -67,6 +72,10 @@ const Register: React.FC<RegisterProps> = ({ onRegister }) => {
       onRegister(data)
       navigate('/')
     } catch (error) {
+      console.error('Registration error:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        error
+      })
       setError(error instanceof Error ? error.message : 'Failed to register')
     } finally {
       setLoading(false)
