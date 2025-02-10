@@ -2,31 +2,63 @@ import jwt from 'jsonwebtoken'
 import User from './User.js'
 
 export const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' })
+  try {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not configured')
+    }
+    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' })
+  } catch (error) {
+    console.error('Token generation error:', {
+      message: error.message,
+      userId
+    })
+    throw error
+  }
 }
 
 export const auth = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '')
     if (!token) {
-      throw new Error()
+      return res.status(401).json({ error: 'No authentication token provided' })
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    let decoded
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET)
+    } catch (jwtError) {
+      console.error('JWT verification error:', {
+        message: jwtError.message,
+        token: token.substring(0, 10) + '...' // Log only part of token for security
+      })
+      return res.status(401).json({ error: 'Invalid or expired token' })
+    }
+
     const user = await User.findById(decoded.userId)
-
     if (!user) {
-      throw new Error()
+      return res.status(401).json({ error: 'User not found' })
     }
 
-    user.lastActive = new Date()
-    await user.save()
+    try {
+      user.lastActive = new Date()
+      await user.save()
+    } catch (saveError) {
+      console.error('Error updating lastActive:', {
+        message: saveError.message,
+        userId: user._id
+      })
+      // Continue even if lastActive update fails
+    }
 
     req.user = user
     req.token = token
     next()
   } catch (error) {
-    res.status(401).send({ error: 'Please authenticate' })
+    console.error('Authentication error:', {
+      message: error.message,
+      stack: error.stack
+    })
+    res.status(500).json({ error: 'Authentication failed' })
   }
 }
 
@@ -34,18 +66,35 @@ export const optionalAuth = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '')
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
-      const user = await User.findById(decoded.userId)
-      if (user) {
-        user.lastActive = new Date()
-        await user.save()
-        req.user = user
-        req.token = token
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        const user = await User.findById(decoded.userId)
+        if (user) {
+          try {
+            user.lastActive = new Date()
+            await user.save()
+          } catch (saveError) {
+            console.error('Error updating lastActive in optionalAuth:', {
+              message: saveError.message,
+              userId: user._id
+            })
+          }
+          req.user = user
+          req.token = token
+        }
+      } catch (tokenError) {
+        console.error('Optional auth token verification error:', {
+          message: tokenError.message,
+          token: token.substring(0, 10) + '...'
+        })
       }
     }
     next()
   } catch (error) {
-    console.log('Optional auth token error:', error.message)
+    console.error('Optional auth error:', {
+      message: error.message,
+      stack: error.stack
+    })
     next()
   }
 }

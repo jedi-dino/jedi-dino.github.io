@@ -43,30 +43,41 @@ userSchema.index({ email: 1 })
 userSchema.index({ username: 'text', email: 'text' })
 
 userSchema.pre('save', async function(next) {
-  const user = this
-  if (user.isModified('password')) {
-    user.password = await bcrypt.hash(user.password, 8)
+  try {
+    const user = this
+    if (user.isModified('password')) {
+      const salt = await bcrypt.genSalt(10)
+      user.password = await bcrypt.hash(user.password, salt)
+    }
+    next()
+  } catch (error) {
+    console.error('Password hashing error:', {
+      message: error.message,
+      stack: error.stack
+    })
+    next(error)
   }
-  next()
 })
 
-userSchema.methods.toJSON = function() {
-  const user = this.toObject()
-  delete user.password
-  return user
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  try {
+    return await bcrypt.compare(candidatePassword, this.password)
+  } catch (error) {
+    console.error('Password comparison error:', {
+      message: error.message,
+      stack: error.stack
+    })
+    throw error
+  }
 }
 
-userSchema.statics.findByCredentials = async (username, password) => {
-  const user = await User.findOne({ username: username.toLowerCase() })
-  if (!user) {
-    throw new Error('Invalid credentials')
+// Use transform for better control over JSON serialization
+userSchema.set('toJSON', {
+  transform: function(doc, ret) {
+    delete ret.password
+    return ret
   }
-  const isMatch = await bcrypt.compare(password, user.password)
-  if (!isMatch) {
-    throw new Error('Invalid credentials')
-  }
-  return user
-}
+})
 
 const User = mongoose.model('User', userSchema)
 

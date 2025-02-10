@@ -48,13 +48,26 @@ app.use('/api/users/uploads', express.static(path.join(__dirname, 'uploads')))
 
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000
+}).catch(err => {
+  console.error('MongoDB connection error:', err)
 })
 
 const db = mongoose.connection
-db.on('error', console.error.bind(console, 'MongoDB connection error:'))
+db.on('error', (err) => {
+  console.error('MongoDB error:', err)
+})
 db.once('open', () => {
   console.log('Connected to MongoDB')
+})
+
+// Handle MongoDB operation errors
+db.on('disconnected', () => {
+  console.log('MongoDB disconnected. Attempting to reconnect...')
+})
+db.on('reconnected', () => {
+  console.log('MongoDB reconnected')
 })
 
 app.get('/health', (req, res) => {
@@ -66,11 +79,41 @@ app.use('/api/users', userRoutes)
 app.use('/api/messages', messageRoutes)
 app.use('/api/notes', noteRoutes)
 
+// Enhanced error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack)
+  console.error('Error details:', {
+    message: err.message,
+    stack: err.stack,
+    code: err.code,
+    name: err.name
+  })
+
+  // Handle MongoDB specific errors
+  if (err.name === 'MongoError' || err.name === 'MongoServerError') {
+    if (err.code === 11000) {
+      return res.status(400).json({
+        error: 'Duplicate key error',
+        message: 'Username or email already exists'
+      })
+    }
+    return res.status(500).json({
+      error: 'Database error',
+      message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred with the database'
+    })
+  }
+
+  // Handle validation errors
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation error',
+      message: err.message
+    })
+  }
+
+  // Generic error response
   res.status(500).json({
     error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+    message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'
   })
 })
 
