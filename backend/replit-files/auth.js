@@ -7,7 +7,7 @@ export const generateToken = (userId) => {
       throw new Error('JWT_SECRET environment variable is not defined')
     }
     const token = jwt.sign(
-      { _id: userId.toString() },
+      { userId },
       process.env.JWT_SECRET,
       { expiresIn: '7d', algorithm: 'HS256' }
     )
@@ -35,7 +35,7 @@ export const auth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    const user = await User.findOne({ _id: decoded._id })
+    const user = await User.findById(decoded.userId)
 
     if (!user) {
       throw new Error('User not found')
